@@ -39,8 +39,9 @@ const Anchor = struct {
         }
 
         if (self.page_faults > 0) {
-            const k_per_fault: f64 = (float(self.processed_byte_count) / 1024.0) / float(self.page_faults);
-            print("\n  Page faults: {} ({d:.2}k per fault)", .{ self.page_faults, k_per_fault });
+            const processed_kb = float(self.processed_byte_count) / 1000.0;
+            const kb_per_fault: f64 = processed_kb / float(self.page_faults);
+            print("\n  Page faults: {} ({d:.2}k per fault)", .{ self.page_faults, kb_per_fault });
         }
 
         print("\n", .{});
