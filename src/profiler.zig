@@ -17,13 +17,14 @@ const Anchor = struct {
     tsc_start: u64 = 0,
     // Elapsed
     tsc_elapsed: u64 = 0,
+    page_faults: u64 = 0,
     processed_byte_count: u64 = 0,
     label: []const u8 = "",
 
-    fn print_time_elapsed(self: *Self, total_cpu_elapsed: u64, timer_freq: u64) void {
+    fn print_info(self: *Self, total_cpu_elapsed: u64, timer_freq: u64) void {
         const percent: f64 = 100.0 * float(self.tsc_elapsed) / float(total_cpu_elapsed);
         const ms = 1000.0 * float(self.tsc_elapsed) / float(timer_freq);
-        print("\n  {s}: {d}ms - {} ({d}%)\n", .{ self.label, ms, self.tsc_elapsed, percent });
+        print("\n  {s}: {d:.2}ms - {} ({d:.2}%)", .{ self.label, ms, self.tsc_elapsed, percent });
 
         if (self.processed_byte_count > 0) {
             const megabyte: f64 = 1024.0 * 1024.0;
@@ -34,7 +35,12 @@ const Anchor = struct {
             const megabytes = float(self.processed_byte_count) / megabyte;
             const gigabytes_per_sec = bytes_per_sec / gigabyte;
 
-            print("  {d} MB at {d} GB/s", .{ megabytes, gigabytes_per_sec });
+            print("\n  {d:.4} MB at {d:.4} GB/s", .{ megabytes, gigabytes_per_sec });
+        }
+
+        if (self.page_faults > 0) {
+            const k_per_fault: f64 = (float(self.processed_byte_count) / 1024.0) / float(self.page_faults);
+            print("\n  Page faults: {} ({d:.2}k per fault)", .{ self.page_faults, k_per_fault });
         }
 
         print("\n", .{});
@@ -46,6 +52,7 @@ pub const Profiler = struct {
 
     tsc_start: u64 = 0,
     tsc_end: u64 = 0,
+    page_faults: u64 = 0,
     anchors: [4096]Anchor = undefined,
     next_anchor_index: u64 = 0,
 
@@ -64,6 +71,7 @@ pub const Profiler = struct {
         var anchor = &self.anchors[self.next_anchor_index];
         anchor.label = label;
         anchor.tsc_start = cpu.readCpuTimer();
+        anchor.page_faults = cpu.readOsPageFaultCount();
         defer self.next_anchor_index += 1;
         return self.next_anchor_index;
     }
@@ -71,6 +79,7 @@ pub const Profiler = struct {
     pub fn stop_block(self: *Self, block_id: u64, processed_byte_count: u64) void {
         var anchor = &self.anchors[block_id];
         anchor.tsc_elapsed = cpu.readCpuTimer() - anchor.tsc_start;
+        anchor.page_faults = cpu.readOsPageFaultCount() - anchor.page_faults;
         anchor.processed_byte_count = processed_byte_count;
     }
 
@@ -92,7 +101,7 @@ pub const Profiler = struct {
         for (0..self.next_anchor_index) |i| {
             var anchor = &self.anchors[i];
             if (anchor.tsc_elapsed == 0) break;
-            anchor.print_time_elapsed(total_cpu_elapsed, timer_freq);
+            anchor.print_info(total_cpu_elapsed, timer_freq);
         }
     }
 };

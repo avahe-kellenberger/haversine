@@ -48,7 +48,13 @@ pub fn estimate_cpu_timer_freq() u64 {
     return cpu_freq;
 }
 
+pub fn readOsPageFaultCount() u64 {
+    const usage = std.posix.getrusage(std.posix.rusage.SELF);
+    return @intCast(usage.minflt + usage.majflt);
+}
+
 test {
-    std.log.warn("{}", .{readOsTimer()});
-    std.log.warn("{}", .{readCpuTimer()});
+    std.log.warn("readOsTimer: {}", .{readOsTimer()});
+    std.log.warn("readCpuTimer: {}", .{readCpuTimer()});
+    std.log.warn("readOsPageFaultCount: {}", .{readOsPageFaultCount()});
 }
